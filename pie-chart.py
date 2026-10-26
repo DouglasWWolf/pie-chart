@@ -48,10 +48,10 @@ class FractionApp:
     )
     self.btn_visualize.pack(side=tk.LEFT, padx=8)
 
-    # Slide / Overlap Button
+    # Compare Button
     self.btn_overlap = tk.Button(
         control_frame,
-        text="Slide to Compare (Overlap)",
+        text="Compare",
         command=self.toggle_overlap,
         bg="#e67e22",
         fg="white",
@@ -80,7 +80,7 @@ class FractionApp:
         0.5,
         (
             "Enter fractions above (e.g., 1/2, 2/4, 4/8)\nand click Visualize\n"
-            "(Use 'Slide to Compare' when comparing 2 or more fractions)"
+            "(Use 'Compare' when comparing 2 or more fractions)"
         ),
         fontsize=13,
         ha="center",
@@ -143,11 +143,9 @@ class FractionApp:
     self.is_overlapped = False
 
     if len(self.fractions) >= 2:
-      self.btn_overlap.config(
-          state=tk.NORMAL, text="Slide to Compare (Overlap)"
-      )
+      self.btn_overlap.config(state=tk.NORMAL, text="Compare")
     else:
-      self.btn_overlap.config(state=tk.DISABLED, text="Slide to Compare")
+      self.btn_overlap.config(state=tk.DISABLED, text="Compare")
 
     try:
       self.render_plot()
@@ -161,7 +159,7 @@ class FractionApp:
     if self.is_overlapped:
       self.btn_overlap.config(text="Reset View")
     else:
-      self.btn_overlap.config(text="Slide to Compare (Overlap)")
+      self.btn_overlap.config(text="Compare")
 
     try:
       self.render_plot()
