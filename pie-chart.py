@@ -11,49 +11,56 @@ class FractionApp:
   def __init__(self, root):
     self.root = root
     self.root.title("Fraction Pie Chart Visualizer")
-    self.root.geometry("850x650")
-    self.root.minsize(700, 500)
+    self.root.geometry("950x700")
+    self.root.minsize(750, 520)
 
-    # 1. Top Control Panel (Entry field and Button)
-    control_frame = tk.Frame(root, bg="#f0f0f0", pady=12, padx=12)
+    self.fractions = []
+    self.is_overlapped = False
+
+    # 1. Top Control Panel
+    control_frame = tk.Frame(root, bg="#f0f0f0", pady=14, padx=14)
     control_frame.pack(side=tk.TOP, fill=tk.X)
 
     tk.Label(
         control_frame,
-        text="Fractions (comma-separated):",
-        font=("Arial", 11, "bold"),
+        text="Fractions:",
+        font=("Arial", 12, "bold"),
         bg="#f0f0f0",
     ).pack(side=tk.LEFT, padx=(0, 8))
 
-    # Start with an empty entry field
     self.entry_var = tk.StringVar(value="")
     self.entry = tk.Entry(
-        control_frame, textvariable=self.entry_var, width=32, font=("Arial", 11)
+        control_frame, textvariable=self.entry_var, width=28, font=("Arial", 12)
     )
-    self.entry.pack(side=tk.LEFT, padx=5)
-    # Allow pressing 'Enter' to submit
+    self.entry.pack(side=tk.LEFT, padx=6)
     self.entry.bind("<Return>", lambda event: self.visualize())
 
-    self.btn = tk.Button(
+    # Buttons 50% bigger
+    self.btn_visualize = tk.Button(
         control_frame,
         text="Visualize",
         command=self.visualize,
         bg="#3498db",
         fg="white",
-        font=("Arial", 10, "bold"),
-        padx=12,
-        pady=2,
+        font=("Arial", 15, "bold"),
+        padx=15,
+        pady=4,
     )
-    self.btn.pack(side=tk.LEFT, padx=10)
+    self.btn_visualize.pack(side=tk.LEFT, padx=8)
 
-    # Helper instruction label
-    tk.Label(
+    # Slide / Overlap Button
+    self.btn_overlap = tk.Button(
         control_frame,
-        text="(Type fractions & press Enter)",
-        font=("Arial", 9, "italic"),
-        fg="#666666",
-        bg="#f0f0f0",
-    ).pack(side=tk.LEFT, padx=5)
+        text="Slide to Compare (Overlap)",
+        command=self.toggle_overlap,
+        bg="#e67e22",
+        fg="white",
+        font=("Arial", 15, "bold"),
+        padx=15,
+        pady=4,
+        state=tk.DISABLED,
+    )
+    self.btn_overlap.pack(side=tk.LEFT, padx=10)
 
     # 2. Matplotlib Figure & Canvas Area
     self.fig, self.ax = plt.subplots(figsize=(8, 6))
@@ -62,7 +69,6 @@ class FractionApp:
         side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=10
     )
 
-    # Initially display a blank plot with instructions
     self.show_blank_screen()
 
   def show_blank_screen(self):
@@ -72,25 +78,42 @@ class FractionApp:
     ax.text(
         0.5,
         0.5,
-        "Enter fractions above (e.g., 3/5, 6/10, 5/3)\nand click Visualize",
-        fontsize=14,
+        (
+            "Enter fractions above (e.g., 1/2, 2/4, 4/8)\nand click Visualize\n"
+            "(Use 'Slide to Compare' when comparing 2 or more fractions)"
+        ),
+        fontsize=13,
         ha="center",
         va="center",
         color="#7f8c8d",
     )
     self.canvas.draw()
+    self.btn_overlap.config(state=tk.DISABLED)
+    self.is_overlapped = False
+
+  def create_grid(self, num_rows, num_cols):
+    """Universally compatible grid creator using add_subplot"""
+    self.fig.clear()
+    axes = []
+    for r in range(num_rows):
+      row_axes = []
+      for c in range(num_cols):
+        plot_num = r * num_cols + c + 1
+        ax = self.fig.add_subplot(num_rows, num_cols, plot_num)
+        ax.set_aspect("equal")
+        row_axes.append(ax)
+      axes.append(row_axes)
+    return axes
 
   def visualize(self):
     fraction_str = self.entry_var.get().strip()
-
     if not fraction_str:
       self.show_blank_screen()
       return
 
-    # Parse fractions directly without auto-simplifying
     try:
       parts = fraction_str.split(",")
-      fractions = []
+      parsed = []
       for p in parts:
         p = p.strip()
         if not p:
@@ -104,89 +127,172 @@ class FractionApp:
         d = int(sub_parts[1].strip())
         if d == 0:
           raise ValueError("Denominator cannot be zero.")
-        fractions.append((n, d))
+        parsed.append((n, d))
     except Exception as e:
       messagebox.showerror(
           "Input Error",
-          f"Invalid format: {e}\nPlease use format like '3/5, 6/10'.",
+          f"Invalid format: {e}\nPlease use format like '1/2, 2/4, 4/8'.",
       )
       return
 
-    if not fractions:
+    if not parsed:
       self.show_blank_screen()
       return
 
-    # Clear previous plot
-    self.fig.clear()
+    self.fractions = parsed
+    self.is_overlapped = False
 
+    if len(self.fractions) >= 2:
+      self.btn_overlap.config(
+          state=tk.NORMAL, text="Slide to Compare (Overlap)"
+      )
+    else:
+      self.btn_overlap.config(state=tk.DISABLED, text="Slide to Compare")
+
+    try:
+      self.render_plot()
+    except Exception as e:
+      messagebox.showerror("Rendering Error", f"An error occurred while plotting: {e}")
+
+  def toggle_overlap(self):
+    if len(self.fractions) < 2:
+      return
+    self.is_overlapped = not self.is_overlapped
+    if self.is_overlapped:
+      self.btn_overlap.config(text="Reset View")
+    else:
+      self.btn_overlap.config(text="Slide to Compare (Overlap)")
+
+    try:
+      self.render_plot()
+    except Exception as e:
+      messagebox.showerror("Rendering Error", f"An error occurred while overlaying: {e}")
+
+  def render_plot(self):
+    fractions = self.fractions
     num_rows = len(fractions)
     max_circles = max((n + d - 1) // d for n, d in fractions)
 
-    # Setup axes grid
-    axes = self.fig.subplots(
-        num_rows, max_circles, squeeze=False, subplot_kw={"aspect": "equal"}
-    )
+    colors = ["#3498db", "#e74c3c", "#2ecc71", "#9b59b6", "#e67e22", "#1abc9c"]
 
-    self.fig.suptitle(
-        "Fraction Pie Chart Visualizer",
-        fontsize=14,
-        fontweight="bold",
-        y=0.96,
-    )
+    if self.is_overlapped and len(fractions) >= 2:
+      # Multi-Fraction Overlay Mode with complete circles
+      max_c = max((n + d - 1) // d for n, d in fractions)
 
-    for row_idx, (n, d) in enumerate(fractions):
-      num_circles_needed = (n + d - 1) // d
+      axes_overlap = self.create_grid(1, max_c)
+      summary_text = "Comparing: " + ", ".join([f"{n}/{d}" for n, d in fractions])
+      self.fig.suptitle(
+          summary_text,
+          fontsize=12,
+          fontweight="bold",
+          y=0.96,
+      )
 
-      for col_idx in range(max_circles):
-        ax = axes[row_idx, col_idx]
+      for col_idx in range(max_c):
+        ax = axes_overlap[0][col_idx]
         ax.axis("off")
 
-        # Place fraction label to the left of the first column
         if col_idx == 0:
           ax.text(
               -1.6,
               0,
-              f"{n}/{d}",
-              fontsize=12,
+              "Overlap\nView",
+              fontsize=11,
               fontweight="bold",
               ha="right",
               va="center",
           )
 
-        # Draw circles if needed
-        if col_idx < num_circles_needed:
-          filled_in_this_circle = min(d, max(0, n - col_idx * d))
-          angle_step = 360 / d
+        # Draw each fraction with concentric radii and complete circles (filled + unfilled slices)
+        for i, (n, d) in enumerate(fractions):
+          num_c = (n + d - 1) // d
+          if col_idx < num_c:
+            filled = min(d, max(0, n - col_idx * d))
+            angle_step = 360 / d
+            # Gradually decrease radius for each layered fraction
+            r = max(0.35, 1.0 - (i * 0.15))
 
-          for slice_idx in range(d):
-            start_angle = slice_idx * angle_step
-            end_angle = (slice_idx + 1) * angle_step
+            for s_idx in range(d):
+              if s_idx < filled:
+                face = colors[i % len(colors)]
+                alpha = 0.75
+              else:
+                face = "#f1f2f6"  # Light background tint to complete the full circle
+                alpha = 0.35
 
-            # Blue for filled, white for empty
-            if slice_idx < filled_in_this_circle:
-              facecolor = "#3498db"
-              alpha = 0.9
-            else:
-              facecolor = "white"
-              alpha = 1.0
+              wedge = Wedge(
+                  (0, 0),
+                  r,
+                  s_idx * angle_step,
+                  (s_idx + 1) * angle_step,
+                  facecolor=face,
+                  edgecolor="black",
+                  linewidth=0.7,
+                  alpha=alpha,
+              )
+              ax.add_patch(wedge)
 
-            wedge = Wedge(
-                center=(0, 0),
-                r=1,
-                theta1=start_angle,
-                theta2=end_angle,
-                facecolor=facecolor,
-                edgecolor="black",
-                linewidth=1.2,
-                alpha=alpha,
+        ax.set_xlim(-1.3, 1.3)
+        ax.set_ylim(-1.3, 1.3)
+
+    else:
+      # Normal Multi-Row Display Mode
+      axes = self.create_grid(num_rows, max_circles)
+      self.fig.suptitle(
+          "Fraction Pie Chart Visualizer",
+          fontsize=14,
+          fontweight="bold",
+          y=0.96,
+      )
+
+      for row_idx, (n, d) in enumerate(fractions):
+        num_circles_needed = (n + d - 1) // d
+        for col_idx in range(max_circles):
+          ax = axes[row_idx][col_idx]
+          ax.axis("off")
+
+          if col_idx == 0:
+            ax.text(
+                -1.6,
+                0,
+                f"{n}/{d}",
+                fontsize=12,
+                fontweight="bold",
+                ha="right",
+                va="center",
             )
-            ax.add_patch(wedge)
 
-          ax.set_xlim(-1.3, 1.3)
-          ax.set_ylim(-1.3, 1.3)
-        else:
-          ax.set_xlim(-1.3, 1.3)
-          ax.set_ylim(-1.3, 1.3)
+          if col_idx < num_circles_needed:
+            filled_in_this_circle = min(d, max(0, n - col_idx * d))
+            angle_step = 360 / d
+
+            for slice_idx in range(d):
+              start_angle = slice_idx * angle_step
+              end_angle = (slice_idx + 1) * angle_step
+              facecolor = (
+                  colors[row_idx % len(colors)]
+                  if slice_idx < filled_in_this_circle
+                  else "white"
+              )
+              alpha = 0.9
+
+              wedge = Wedge(
+                  center=(0, 0),
+                  r=1,
+                  theta1=start_angle,
+                  theta2=end_angle,
+                  facecolor=facecolor,
+                  edgecolor="black",
+                  linewidth=1.2,
+                  alpha=alpha,
+              )
+              ax.add_patch(wedge)
+
+            ax.set_xlim(-1.3, 1.3)
+            ax.set_ylim(-1.3, 1.3)
+          else:
+            ax.set_xlim(-1.3, 1.3)
+            ax.set_ylim(-1.3, 1.3)
 
     self.fig.tight_layout(rect=[0, 0, 1, 0.95])
     self.canvas.draw()
