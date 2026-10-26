@@ -79,7 +79,7 @@ class FractionApp:
         0.5,
         0.5,
         (
-            "Enter fractions above (e.g., 1/2, 2/4, 4/8)\nand click Visualize\n"
+            "Enter fractions above (e.g., 0/4, 2/4, 4/4)\nand click Visualize\n"
             "(Use 'Compare' when comparing 2 or more fractions)"
         ),
         fontsize=13,
@@ -127,11 +127,13 @@ class FractionApp:
         d = int(sub_parts[1].strip())
         if d == 0:
           raise ValueError("Denominator cannot be zero.")
+        if n < 0:
+          raise ValueError("Numerator cannot be negative.")
         parsed.append((n, d))
     except Exception as e:
       messagebox.showerror(
           "Input Error",
-          f"Invalid format: {e}\nPlease use format like '1/2, 2/4, 4/8'.",
+          f"Invalid format: {e}\nPlease use format like '0/4, 2/4, 4/4'.",
       )
       return
 
@@ -169,13 +171,17 @@ class FractionApp:
   def render_plot(self):
     fractions = self.fractions
     num_rows = len(fractions)
-    max_circles = max((n + d - 1) // d for n, d in fractions)
+    
+    # Helper to calculate circles needed (handles 0 numerator gracefully as 1 circle)
+    def get_num_circles(n, d):
+      return 1 if n == 0 else (n + d - 1) // d
 
+    max_circles = max(get_num_circles(n, d) for n, d in fractions)
     colors = ["#3498db", "#e74c3c", "#2ecc71", "#9b59b6", "#e67e22", "#1abc9c"]
 
     if self.is_overlapped and len(fractions) >= 2:
       # Multi-Fraction Overlay Mode with complete circles
-      max_c = max((n + d - 1) // d for n, d in fractions)
+      max_c = max(get_num_circles(n, d) for n, d in fractions)
 
       axes_overlap = self.create_grid(1, max_c)
       summary_text = "Comparing: " + ", ".join([f"{n}/{d}" for n, d in fractions])
@@ -201,13 +207,12 @@ class FractionApp:
               va="center",
           )
 
-        # Draw each fraction with concentric radii and complete circles (filled + unfilled slices)
+        # Draw each fraction with concentric radii and complete circles
         for i, (n, d) in enumerate(fractions):
-          num_c = (n + d - 1) // d
+          num_c = get_num_circles(n, d)
           if col_idx < num_c:
             filled = min(d, max(0, n - col_idx * d))
             angle_step = 360 / d
-            # Gradually decrease radius for each layered fraction
             r = max(0.35, 1.0 - (i * 0.15))
 
             for s_idx in range(d):
@@ -215,7 +220,7 @@ class FractionApp:
                 face = colors[i % len(colors)]
                 alpha = 0.75
               else:
-                face = "#f1f2f6"  # Light background tint to complete the full circle
+                face = "#f1f2f6"
                 alpha = 0.35
 
               wedge = Wedge(
@@ -244,7 +249,7 @@ class FractionApp:
       )
 
       for row_idx, (n, d) in enumerate(fractions):
-        num_circles_needed = (n + d - 1) // d
+        num_circles_needed = get_num_circles(n, d)
         for col_idx in range(max_circles):
           ax = axes[row_idx][col_idx]
           ax.axis("off")
